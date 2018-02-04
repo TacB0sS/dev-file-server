@@ -91,8 +91,8 @@ function addItemPost(request, response) {
         return;
     }
     request.on('end', function () {
-        const post = JSON.parse(body);
-        addItemImpl(post, response);
+        const fileContent = JSON.parse(body);
+        addItemImpl(fileContent, response);
     });
 }
 
@@ -120,7 +120,7 @@ function addItemImpl(post, response) {
     const outputFile = `${folder}/${post.itemName}.json`;
     console.log("outputFile: " + outputFile);
 
-    fs.writeFileSync(outputFile, JSON.stringify(post.jsonBody, null, 2), 'utf8');
+    fs.writeFileSync(outputFile, post.jsonBody, 'utf8');
     response.writeHead(200, {
         'content-type': 'text/plain'
     });
