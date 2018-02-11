@@ -1,12 +1,11 @@
 <div>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         <div>
             <input type="text" name="groupName" placeholder="Group...">
         </div>
         <div>
-            <input type="text" name="itemName" placeholder="Key...">
+            <input type="file" name="upload" multiple="multiple">
         </div>
-        <input name="jsonBody" rows="30" cols="60" placeholder="json here..">
         <div>
             <input type="submit">
         </div>

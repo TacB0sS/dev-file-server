@@ -47,7 +47,7 @@ function readAndServeFile(filePath, contentType, response) {
 function addItemUI(request, response) {
     switch (request.method.toLowerCase()) {
         case 'get':
-            serveFile("./pages/add-item.html", response);
+            serveFile("./pages" + request.url + ".html", response);
             break;
         case "post":
             processAllFieldsOfTheForm(request, response);
@@ -57,10 +57,34 @@ function addItemUI(request, response) {
 
 function processAllFieldsOfTheForm(request, response) {
     const form = new formidable.IncomingForm();
-
+    form.multiples = true;
     form.parse(request, function (err, fields, files) {
-        fields.actions = decodeURI(fields.actions);
-        addItemImpl(fields, response);
+        let folder = createFolderIfDoesntExists(fields);
+
+        let counter = 0;
+        files.upload.forEach((file) => {
+            counter++;
+            fs.rename(file.path, `${folder}/${file.name}`, function (err) {
+                counter--;
+                if (err) {
+                    response.writeHead(500, {
+                        'content-type': 'text/plain'
+                    });
+                    response.write('Error uploading.');
+                    response.end();
+                    return;
+                }
+
+                if (counter > 0)
+                    return;
+
+                response.writeHead(200, {
+                    'content-type': 'text/plain'
+                });
+                response.write('received the data.');
+                response.end();
+            });
+        })
     });
 }
 
@@ -78,23 +102,23 @@ function readBody(request) {
     return body;
 }
 
-function addItemPost(request, response) {
-    const body = readBody(request);
-    if (body.length === 0) {
-        const expectedBody = {};
-        expectedBody.itemName = "item name here";
-        expectedBody.groupName = "group name here";
-        expectedBody.jsonBody = "json body here";
-
-        response.writeHead(400);
-        response.end(`Expected json body example:\n\n${JSON.stringify(expectedBody, null, 2)}`, 'utf-8');
-        return;
-    }
-    request.on('end', function () {
-        const fileContent = JSON.parse(body);
-        addItemImpl(fileContent, response);
-    });
-}
+// function addItemPost(request, response) {
+//     const body = readBody(request);
+//     if (body.length === 0) {
+//         const expectedBody = {};
+//         expectedBody.itemName = "item name here";
+//         expectedBody.groupName = "group name here";
+//         expectedBody.jsonBody = "json body here";
+//
+//         response.writeHead(400);
+//         response.end(`Expected json body example:\n\n${JSON.stringify(expectedBody, null, 2)}`, 'utf-8');
+//         return;
+//     }
+//     request.on('end', function () {
+//         const fileContent = JSON.parse(body);
+//         addItemImpl(fileContent, response);
+//     });
+// }
 
 function createFolderIfDoesntExists(post) {
     let folder = `./${ContentFolder}${post.groupName ? "/" + post.groupName : ""}`;
@@ -114,20 +138,6 @@ function mkdirs(folder) {
     });
 }
 
-function addItemImpl(post, response) {
-    let folder = createFolderIfDoesntExists(post);
-
-    const outputFile = `${folder}/${post.itemName}.json`;
-    console.log("outputFile: " + outputFile);
-
-    fs.writeFileSync(outputFile, post.jsonBody, 'utf8');
-    response.writeHead(200, {
-        'content-type': 'text/plain'
-    });
-    response.write('received the data.');
-    response.end();
-}
-
 function serveFile(filePath, response) {
     if (!fs.existsSync(filePath)) {
         response.writeHead(404);
@@ -145,7 +155,7 @@ function listFiles(request, response) {
     const groupFolder = createFolderIfDoesntExists(query);
 
     const items = fs.readdirSync(groupFolder).filter(function (itemName) {
-        return itemName.endsWith(".json") || !query.groupName;
+        return itemName.indexOf(".") !== -1 || !query.groupName;
     }).map(function (itemName) {
         return query.groupName ? itemName.substring(0, itemName.length - ".json".length) : itemName;
     });
@@ -158,15 +168,18 @@ const port = 2999;
 http.createServer(function (request, response) {
     console.log('request starting...');
 
-    if (request.url.startsWith("/add-item"))
+    if (request.url.startsWith("/add-"))
         addItemUI(request, response);
-    else if (request.url.startsWith("/add-api"))
-        addItemPost(request, response);
+    // else if (request.url.startsWith("/add-api"))
+    //     addItemPost(request, response);
     else if (request.url.startsWith("/list"))
         listFiles(request, response);
     else if (request.url.startsWith(`/get-item`)) {
         const query = url.parse(request.url, true).query;
-        const filePath = `./${ContentFolder}/${query.groupName}/${query.itemName}.json`;
+        if (query.itemName.indexOf(".") === -1)
+            query.itemName += ".json"
+
+        const filePath = `./${ContentFolder}/${query.groupName}/${query.itemName}`;
 
         serveFile(filePath, response);
     } else {
